@@ -15,11 +15,20 @@ class TasksController extends Controller
      */
     public function index()
     {
-        $tasks = Task::all();
+        $date = [];
+        if (\Auth::check()) { //認証済みの場合
+            // 認証済みのユーザを取得
+            $user = \Auth::user();
+            
+            $tasks = $user->tasks()->get();
+            
+            $date =[
+                'user' => $user,
+                'tasks' => $tasks,
+            ];
+        }
         
-        return view('tasks.index',[
-            'tasks' => $tasks,
-            ]);
+        return view('welcome', $date);
     }
 
     /**
@@ -47,12 +56,13 @@ class TasksController extends Controller
         $request->validate([
             'status' => 'required|max:10',
             'content' => 'required|max:255',
+            
         ]);
         
-        $task = new Task;
-        $task->status = $request->status;
-        $task->content = $request->content;
-        $task->save();
+        $request->user()->tasks()->create([
+            'status' => $request->status,
+            'content' => $request->content,
+        ]);
         
         // トップページへリダイレクトさせる
         return redirect('/');
@@ -68,9 +78,13 @@ class TasksController extends Controller
     {
         $task = Task::findOrFail($id);
         
-        return view('tasks.show', [
-            'task' => $task,
-        ]);
+        if (\Auth::id() === $task->user_id) {
+            return view('tasks.show', [
+                'task' => $task,
+            ]);
+        }
+        
+        return redirect('/');
     }
 
     /**
@@ -83,9 +97,13 @@ class TasksController extends Controller
     {
         $task = Task::findOrFail($id);
         
-        return view('tasks.edit', [
-            'task' => $task,
-        ]);
+        if (\Auth::id() === $task->user_id) {
+            return view('tasks.edit', [
+                'task' => $task,
+             ]);
+        }
+        
+        return redirect('/');
     }
 
     /**
@@ -106,7 +124,10 @@ class TasksController extends Controller
         
         $task->status = $request->status;
         $task->content = $request->content;
-        $task->save();
+        
+        if (\Auth::id() === $task->user_id) {
+            $task->save();
+        }
 
         // トップページへリダイレクトさせる
         return redirect('/');
@@ -120,9 +141,13 @@ class TasksController extends Controller
      */
     public function destroy($id)
     {
-        $task = Task::findOrFail($id);
+        $task = \App\Task::findOrFail($id);
         
-        $task->delete();
+        //認証済みユーザがその投稿の所有者の場合は削除
+        if (\Auth::id() === $task->user_id) {
+             $task->delete();
+        }
+       
 
         // トップページへリダイレクトさせる
         return redirect('/');
